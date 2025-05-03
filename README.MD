@@ -1,56 +1,125 @@
-# Invoice track
+# InvoiceTrack
 
-Parse XML files and obtain specific values from them.
+**InvoiceTrack** is a CLI tool designed to process and track invoice balances from daily statement files (e.g., XML or JSON). It ensures accurate aggregation and analysis of billing data by leveraging Go’s concurrency model.
 
-## Description
+## 🧠 Overview
 
-Market Participants (MP) in the Wholesale Electrical Market in Mexico receive Statements of Account (ECD for its Spanish abbreviation) on a daily basis. These ECDs are issued by the Market Operator and serve as a guide to understand every single aspect of the MP’s operation.
+InvoiceTrack scans a directory for files with a given extension (e.g., `.xml`), extracts invoice data, and computes the total balances.
+### Key Features
 
-## Instructions
 
-The objective of this test is to write code that allows us to summarize the ECD contents for each MP every day. Specifically, we want to calculate the total balance for each invoice found in the ECD files.
+- 🗂 Process multiple files concurrently.
+- 🔄 Built with **pipelines** and **semaphores** to control concurrency.
+- 📄 Supports different file formats (`xml`, `json`, etc.).
+- 🛠 Extensible design for additional processing logic.
 
-The `<concepto>` nodes have a special child node `<monto_total>` that displays the monetary value represented by that node for the entire day. This is the value you need to extract from each _concepto_ node. For the sake of this test, you will only need to sum the `<monto_total>` inside the `<liquidacion num_liq="0">` invoices (`<factura>` nodes).
+---
 
-We have included a .NET project which can be used as a starter point. However, you can use another language if you wish.
+## Run Project
 
-In the attached code (_Program.cs_), we have provided some comments to guide you through the process:
+This project provides a CLI tool to process and aggregate invoice balances from statement files using concurrent patterns like **pipelines** and **semaphores**.
 
-1. **Change the location of the XML files** to a defined “xml repo” that should be located in the local Documents directory.
-2. **Write the code to parse the XML files**. You can choose to either write local functions in Program.cs or develop the ECD_File class in Handler.cs to handle the processing.
-3. **Define an appropriate structure** to return the necessary information. Keep in mind that the current code only iterates through a list of files and prints their names. We still need to extract data to aggregate the total for each invoice!
-4. **Print the total of each invoice** for each provided ECD. You have flexibility in choosing the output format and style.
-5. **Send your code and output file** to eduardo.hernandez@bravosenergia.com with the subject ‘ECD XML test - [your name initials]’. You can also share a git repo or a drive folder with the files. _Please also attach your professional resume in the email._
+### 📦 Available Command
 
-Finally, you may have noticed that a couple of comments start with ‘\*’. This indicates that it would be nice to make these parameters configurable from an external file (such as a config, JSON, or text file).
+- `compute-invoice-balances`: Reads all statement files from a directory (e.g., XML or JSON) and calculates the total amounts based on specific filtering criteria.
 
-## Considerations
+### Build: 
 
-The current directory has the following items:
+```bash
+go build -tags invoice-track -o ./build/invoice-track cmd/main.go
+```
 
-    TEC_TEST
-    ├── ECD_Handler         -> Project ECD_Handler directory
-    │   ├── bin                 -> Project binary files
-    │   ├── dependencies        -> Directory for dependencies
-    │   │   ├── Handler
-    │   │   │   ├── Handler.cs          -> Handler dependency file (optional)
-    │   ├── obj                 -> Project pre-compiled files
-    │   ├── XML_files           -> Directory with the ECD files (XML files)
-    │   ├── ECD_Handler.csproj  -> Project definition file
-    │   ├── Program.cs          -> This is the main code file
-    ├── README.md           -> This README file
-    ├── tec_test.sln        -> Solution file
+### ▶️ Run the CLI
 
-The ECD XML files have a specific structure that remains consistent. In summary, they follow this hierarchy:
+#### 🧩 Optional Flags
 
-    estadodecuenta
-    ├── liquidaciones
-    │   ├── liquidacion num_liq="0"
-    │   │   ├── facturas
-    │   │   │   ├── factura
-    │   │   │   │   ├── conceptos
-    │   │   │   │   │   ├── concepto
-    │   │   │   │   │   │   ├── monto_total
-    │   │   │   │   │   │   ├── ...
-    │   ├── liquidacion num_liq="1"
-    │   │   ...
+This command supports the following flags:
+
+- `--dir`: Path to the folder containing the input files.  
+  **Default**: `${HOME}/Documents/xml_repo`
+
+- `--ext`: File extension to filter (e.g., `xml`, `json`).  
+  **Default**: `xml`
+
+
+*Run with default values:* 
+
+```bash
+./build/invoice-track compute-invoice-balances
+```
+
+```bash
+go run ./cmd/main.go compute-invoice-balances
+```
+
+*Run with values:* 
+
+```bash
+./build/invoice-track  compute-invoice-balances --dir <path-to-files> --ext <file-extension>
+```
+
+```bash
+go run ./cmd/main.go  compute-invoice-balances --dir <path-to-files> --ext <file-extension>
+```
+
+## ℹ️ Help
+
+```bash
+./build/invoice-track  compute-invoice-balances --help
+```
+
+```bash
+go run ./cmd/main.go compute-invoice-balances --help
+```
+
+### Run Benchmark:
+
+```bash
+go test -bench ^BenchmarkTotalAmountCalculator$ -benchmem -v ./...
+```
+
+## ⚙️ Architecture
+
+This tool uses Go’s native concurrency primitives:
+
+- **Pipelines**: to decouple stages like file discovery, parsing, and aggregation.
+- **Semaphores**: to limit the number of files being processed concurrently, improving performance and stability.
+
+## 🎨 Processing Flow
+```bash
+                    +--------------+
+                    |   Reader     |
+                    | Reads files  |
+                    +--------------+
+                            |
+                     (chan string)
+                            v
+                    +--------------+
+                    |    Parser    |
+                    |   Parse XML  |
+                    +--------------+
+                            |
+                (chan InvoiceStatement)
+                            v
+                +------------------------+
+                |    FilterSettlements   |
+                |    Only num_liq = "0"  |
+                +------------------------+
+                            |
+                  (chan FilteredInvoice)
+                            v
+            +-------------------------------+
+            |  SumTotalAmountByFUECDAndType |
+            |  Group by FUECD & type        |
+            +-------------------------------+
+                            |
+                        Output
+                (Totals per FUECD/type)
+```
+
+## 📚 References
+
+This section lists the sources, documentation, and tools that were referenced or used in the development of this project:
+
+1. [Pipelines](https://go.dev/blog/pipelines)
+2. [Semaphore](https://www.codingexplorations.com/blog/understanding-and-implementing-the-semaphore-pattern-in-go)

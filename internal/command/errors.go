@@ -19,8 +19,11 @@ func ErrorCommand(commandFunc CommandFunc) func(cmd *cobra.Command, args []strin
 		}
 
 		cmd.PrintErr(CommandError{
-			ErrorDescription: "Failed command process",
+			Code:             "ERR_CMD_EXEC_FAIL",
+			MessageToUser:    "An error occurred while processing your request.",
+			ErrorDescription: "Command execution failed. Please check the parameters or try again.",
 			TraceId:          traceID,
 		})
+
 	}
 }
